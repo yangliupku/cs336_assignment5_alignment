@@ -10,20 +10,16 @@ def create_math_dataset(random_seed=0):
     """split MATH dataset to validation (5k) and sft (7k)"""
     random.seed(random_seed)
     validation_fname = DATASETS_PATH / "MATH" / "validation.jsonl"
-    sft_fname = DATASETS_PATH / "MATH" / "sft.jsonl"
+    training_fname = DATASETS_PATH / "MATH" / "train.jsonl"
     ds = list(load_dataset("qwedsacf/competition_math")["train"])
 
     random.shuffle(ds)
     validation_samples = ds[:5000]
-    sft_samples = ds[5000:]
+    training_samples = ds[5000:]
     print("validation_samples:", len(validation_samples))
-    print("sft_samples:", len(sft_samples))
-    with open(validation_fname, "w") as f:
-        for i in range(len(validation_samples)):
-            f.write(json.dumps(validation_samples[i]) + "\n")
-    with open(sft_fname, "w") as f:
-        for i in range(len(sft_samples)):
-            f.write(json.dumps(sft_samples[i]) + "\n")
+    print("training_samples:", len(training_samples))
+    save_jsonl(validation_samples, validation_fname)
+    save_jsonl(training_samples, training_fname)
 
 
 def load_jsonl(file_name):
