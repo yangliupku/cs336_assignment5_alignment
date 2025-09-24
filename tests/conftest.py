@@ -10,9 +10,16 @@ import torch
 from torch import Tensor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+MODEL_PATH = (Path(__file__).resolve().parent.parent) / "models" / "Qwen2.5-Math-1.5"
+
 
 def pytest_addoption(parser):
-    parser.addoption("--snapshot-exact", action="store_true", help="Use exact matching standards for snapshot matching")
+    parser.addoption(
+        "--snapshot-exact",
+        action="store_true",
+        help="Use exact matching standards for snapshot matching",
+    )
+
 
 _A = TypeVar("_A", np.ndarray, Tensor)
 
@@ -58,7 +65,6 @@ class NumpySnapshot:
         # Convert single array to dictionary for consistent handling
         arrays_dict = actual if isinstance(actual, dict) else {"array": actual}
         arrays_dict = {k: _canonicalize_array(v) for k, v in arrays_dict.items()}
-
 
         # Load the snapshot
         expected_arrays = dict(np.load(snapshot_path))
@@ -110,7 +116,6 @@ class Snapshot:
         """
 
         snapshot_path = self._get_snapshot_path(test_name)
-
 
         # Load the snapshot
         with open(snapshot_path, "rb") as f:
@@ -177,13 +182,17 @@ def numpy_snapshot(request):
     # Patch the assert_match method to include the update flag by default
     original_assert_match = snapshot.assert_match
 
-    def patched_assert_match(actual, test_name=None, force_update=force_update, rtol=1e-4, atol=1e-2):
+    def patched_assert_match(
+        actual, test_name=None, force_update=force_update, rtol=1e-4, atol=1e-2
+    ):
         # If test_name is not provided, use the test function name
         if test_name is None:
             test_name = request.node.name
         if match_exact:
             rtol = atol = 0
-        return original_assert_match(actual, test_name=test_name, force_update=force_update, rtol=rtol, atol=atol)
+        return original_assert_match(
+            actual, test_name=test_name, force_update=force_update, rtol=rtol, atol=atol
+        )
 
     snapshot.assert_match = patched_assert_match
 
@@ -210,7 +219,7 @@ def output_strs():
 
 @pytest.fixture
 def model_id():
-    return "/data/a5-alignment/models/Qwen2.5-Math-1.5B"
+    return MODEL_PATH
 
 
 @pytest.fixture
