@@ -26,7 +26,7 @@ def create_math_dataset(random_seed=0):
             f.write(json.dumps(sft_samples[i]) + "\n")
 
 
-def load_jsonl_dataset(file_name):
+def load_jsonl(file_name):
     results = []
     with open(file_name, "r") as f:
         for line in f:
@@ -34,8 +34,14 @@ def load_jsonl_dataset(file_name):
     return results
 
 
+def save_jsonl(data, filename):
+    with open(filename, "w") as f:
+        for d in data:
+            f.write(json.dumps(d) + "\n")
+
+
 if __name__ == "__main__":
     # create_math_dataset()
-    ds = load_jsonl_dataset(DATASETS_PATH / "MATH" / "validation.jsonl")
+    ds = load_jsonl(DATASETS_PATH / "MATH" / "validation.jsonl")
     print(len(ds))
     print(ds[45])
