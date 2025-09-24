@@ -34,18 +34,26 @@ def tokentize_prompt_and_output(
     return {"input_ids": inputs, "labels": labels, "response_mask": masks}
 
 
+def compute_entropy(logits: torch.Tensor) -> torch.Tensor:
+    logp = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+    p = torch.exp(logp)
+    return torch.sum(-p * logp, dim=-1)
+
+
 if __name__ == "__main__":
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-    print(tokenizer.pad_token_id)
-    prompt_strs = [
-        "Hello, world!",
-        "This is a test.",
-        "This is another test.",
-    ]
-    output_strs = [
-        "Hello, world!",
-        "This is a test.",
-        "This is another test.",
-    ]
-    x = tokentize_prompt_and_output(prompt_strs, output_strs, tokenizer)
-    print(x)
+    # tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    # print(tokenizer.pad_token_id)
+    # prompt_strs = [
+    #     "Hello, world!",
+    #     "This is a test.",
+    #     "This is another test.",
+    # ]
+    # output_strs = [
+    #     "Hello, world!",
+    #     "This is a test.",
+    #     "This is another test.",
+    # ]
+    # x = tokentize_prompt_and_output(prompt_strs, output_strs, tokenizer)
+    # print(x)
+    x = torch.rand(3, 5, 8)
+    print(compute_entropy(x))
