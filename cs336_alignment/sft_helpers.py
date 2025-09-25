@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedModel, AutoModelForCausalLM
 import pathlib
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -40,6 +40,19 @@ def compute_entropy(logits: torch.Tensor) -> torch.Tensor:
     return torch.sum(-p * logp, dim=-1)
 
 
+def get_response_log_probs(
+    model: PreTrainedModel,
+    input_ids: torch.Tensor,
+    labels: torch.Tensor,
+    return_token_entory: bool = False,
+) -> dict[str, torch.Tensor]:
+    logits = model(input_ids).logits
+    logp = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+    log_probs = torch.gather(logp, -1, labels.unsqueeze(-1)).squeeze(-1)
+    token_entropy = compute_entropy(logits) if return_token_entory else None
+    return {"log_probs": log_probs, "token_entropy": token_entropy}
+
+
 if __name__ == "__main__":
     # tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     # print(tokenizer.pad_token_id)
@@ -55,5 +68,10 @@ if __name__ == "__main__":
     # ]
     # x = tokentize_prompt_and_output(prompt_strs, output_strs, tokenizer)
     # print(x)
-    x = torch.rand(3, 5, 8)
-    print(compute_entropy(x))
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_PATH,
+    )
+    input_ids = torch.randint(0, 1024, (2, 3))
+    labels = torch.randint(0, 10000, (2, 3))
+    x = get_response_log_probs(model, input_ids, labels, return_token_entory=True)
+    print(x)
