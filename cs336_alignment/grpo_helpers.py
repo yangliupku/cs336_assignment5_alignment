@@ -62,3 +62,11 @@ def compute_policy_gradient_loss(
         return compute_grpo_clip_loss(advantages, policy_log_probs, old_log_prob, cliprange)
     else:
         raise NotImplementedError
+
+
+def masked_mean(
+    tensor: torch.Tensor,
+    mask: torch.Tensor,
+    dim: int | None = None,
+):
+    return torch.sum(tensor * mask, dim=dim) / (torch.sum(mask, dim=dim))
