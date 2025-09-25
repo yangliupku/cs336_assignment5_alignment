@@ -53,6 +53,15 @@ def get_response_log_probs(
     return {"log_probs": log_probs, "token_entropy": token_entropy}
 
 
+def masked_normalize(
+    tensor: torch.Tensor,
+    mask: torch.Tensor,
+    dim: int | None = None,
+    normalize_constant: float = 1.0,
+):
+    return torch.sum(tensor * mask, dim=dim) / normalize_constant
+
+
 if __name__ == "__main__":
     # tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     # print(tokenizer.pad_token_id)
