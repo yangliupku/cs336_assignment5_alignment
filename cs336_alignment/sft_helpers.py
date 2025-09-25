@@ -44,12 +44,12 @@ def get_response_log_probs(
     model: PreTrainedModel,
     input_ids: torch.Tensor,
     labels: torch.Tensor,
-    return_token_entory: bool = False,
+    return_token_entropy: bool = False,
 ) -> dict[str, torch.Tensor]:
     logits = model(input_ids).logits
     logp = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
     log_probs = torch.gather(logp, -1, labels.unsqueeze(-1)).squeeze(-1)
-    token_entropy = compute_entropy(logits) if return_token_entory else None
+    token_entropy = compute_entropy(logits) if return_token_entropy else None
     return {"log_probs": log_probs, "token_entropy": token_entropy}
 
 
