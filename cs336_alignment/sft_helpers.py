@@ -62,6 +62,23 @@ def masked_normalize(
     return torch.sum(tensor * mask, dim=dim) / normalize_constant
 
 
+def sft_microbatch_train_step(
+    policy_log_probs: torch.Tensor,
+    response_mask: torch.Tensor,
+    gradient_accumulation_steps: int,
+    normalize_constant: float = 1.0,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    loss = masked_normalize(
+        policy_log_probs,
+        response_mask,
+        dim=-1,
+        normalize_constant=normalize_constant,
+    )
+    loss = -1.0 * torch.mean(loss) / gradient_accumulation_steps
+    loss.backward()
+    return (loss, {})
+
+
 if __name__ == "__main__":
     # tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     # print(tokenizer.pad_token_id)
@@ -82,5 +99,5 @@ if __name__ == "__main__":
     )
     input_ids = torch.randint(0, 1024, (2, 3))
     labels = torch.randint(0, 10000, (2, 3))
-    x = get_response_log_probs(model, input_ids, labels, return_token_entory=True)
+    x = get_response_log_probs(model, input_ids, labels, return_token_entropy=True)
     print(x)
