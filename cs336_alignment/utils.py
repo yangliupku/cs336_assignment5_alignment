@@ -35,6 +35,8 @@ def save_jsonl(data, filename):
         for d in data:
             f.write(json.dumps(d) + "\n")
 
+def load_math_validation_set():
+    return load_jsonl(DATASETS_PATH/"MATH"/"validation.jsonl")
 
 if __name__ == "__main__":
     # create_math_dataset()
