@@ -5,7 +5,7 @@ from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 
 MODEL_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "models" / "Qwen2.5-Math-1.5"
 OUPUT_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "outputs"
-
+NUM_RUNS = 5
 ds = load_math_validation_set()
 sampling_params = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=1024, stop=["</answer>"], include_stop_str_in_output=True)
 llm = LLM(model=str(MODEL_PATH))
@@ -15,26 +15,29 @@ def get_prompt(question):
   User: {question}
   Assistant: <think>"""
 
+# ds = ds[:32]
 prompts = [get_prompt(example['problem']) for example in ds]
-responses = llm.generate(prompts, sampling_params)
-
 results = []
-for i in range(len(ds)):
-    question = ds[i]["problem"]
-    solution = ds[i]["solution"]
-    model_response = responses[i].outputs[0].text
-    r1_reward = r1_zero_reward_fn(model_response, solution)
-    results.append(
-       {
-          "question": question,
-          "solution": solution,
-          "model_response": model_response,
-          "r1_format_reward": r1_reward["format_reward"],
-          "r1_answer_reward": r1_reward["answer_reward"],
-          "r1_reward": r1_reward["reward"]
-       }
-    )
-save_jsonl(results, OUPUT_PATH/"math_validation_zero_shot.jsonl")
+for run_id in range(NUM_RUNS):
+   responses = llm.generate(prompts, sampling_params)
+   for i in range(len(ds)):
+      question = ds[i]["problem"]
+      solution = ds[i]["solution"]
+      model_response = responses[i].outputs[0].text
+      r1_reward = r1_zero_reward_fn(model_response, solution)
+      results.append(
+         {
+            "question_id": i,
+            "run_id": run_id,
+            "question": question,
+            "solution": solution,
+            "model_response": model_response,
+            "r1_format_reward": r1_reward["format_reward"],
+            "r1_answer_reward": r1_reward["answer_reward"],
+            "r1_reward": r1_reward["reward"]
+         }
+      )
+save_jsonl(results, OUPUT_PATH/"math_validation_zero_shot_test.jsonl")
 
 
 
