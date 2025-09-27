@@ -68,15 +68,14 @@ def get_old_policy_log_probs_in_batches(
         batch_labels = labels[i : i + batch_size].to(model_device)
         with torch.no_grad():
             batch_logits = model(batch_inputs).logits
-        batch_logp = batch_logits - torch.logsumexp(batch_logits, dim=-1, keepdim=True)
-        batch_log_probs = torch.gather(batch_logp, -1, batch_labels.unsqueeze(-1)).squeeze(-1)
-        batch_token_entropy = compute_entropy(batch_logits)
-        all_log_probs.append(batch_log_probs.cpu())
-        all_token_entropy.append(batch_token_entropy.cpu())
+            batch_logp = batch_logits - torch.logsumexp(batch_logits, dim=-1, keepdim=True)
+            batch_log_probs = torch.gather(batch_logp, -1, batch_labels.unsqueeze(-1)).squeeze(-1)
+            batch_token_entropy = compute_entropy(batch_logits)
+            all_log_probs.append(batch_log_probs.cpu())
+            all_token_entropy.append(batch_token_entropy.cpu())
 
     log_probs = torch.concat(all_log_probs, dim=0)
     token_entropy = torch.concat(all_token_entropy, dim=0) if return_token_entropy else None
-    print("------> log_probs.shape", log_probs.shape)
     return {"log_probs": log_probs, "token_entropy": token_entropy}
 
 

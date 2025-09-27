@@ -186,7 +186,6 @@ for grpo_step in range(N_GRPO_STEPS):
                 old_log_prob=batch_old_log_probs,
                 cliprange=CLIPRANGE,
             )
-            print("-----> idx loss:", loss)
             if (idx + 1) % GRADIENT_ACC_STEPS == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
                 opt.step()
