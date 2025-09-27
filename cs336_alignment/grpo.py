@@ -9,6 +9,7 @@ from cs336_alignment.utils import load_jsonl
 from cs336_alignment.sft_helpers import (
     tokentize_prompt_and_output,
     get_response_log_probs,
+    get_old_policy_log_probs_in_batches,
 )
 from cs336_alignment.grpo_helpers import (
     compute_group_normalized_rewards,
@@ -138,8 +139,7 @@ for grpo_step in range(N_GRPO_STEPS):
         advantage_eps=1e-6,
         normalize_by_std=NORMALIZE_BY_STD,
     )
-    print("---------> advantages:", advantages)
-    print("---------> raw_rewards:", raw_rewards)
+    print("---------> total raw rewards:", torch.sum(raw_rewards))
 
     tokenized_rollout_batch = tokentize_prompt_and_output(
         rollout_repeated_prompts, rollout_responses, tokenizer
@@ -147,16 +147,14 @@ for grpo_step in range(N_GRPO_STEPS):
     rollout_batch_input_ids = tokenized_rollout_batch["input_ids"]
     rollout_batch_labels = tokenized_rollout_batch["labels"]
     rollout_batch_response_masks = tokenized_rollout_batch["response_mask"]
-    with torch.no_grad:
-        rollout_batch_old_log_probs = get_response_log_probs(
-            model, rollout_batch_input_ids, rollout_batch_labels
-        )
+    old_log_prob_res = get_old_policy_log_probs_in_batches(model, rollout_batch_input_ids, rollout_batch_labels)
+    rollout_batch_old_log_probs = old_log_prob_res["log_probs"]
     dataset = TensorDataset(
         rollout_batch_input_ids,
         rollout_batch_labels,
         rollout_batch_response_masks,
-        advantages,
-        raw_rewards,
+        advantages.unsqueeze(-1),
+        raw_rewards.unsqueeze(-1),
         rollout_batch_old_log_probs,
     )
     dataloader = DataLoader(dataset, batch_size=MICRO_TRAIN_BATCH_SIZE, shuffle=True)
@@ -170,7 +168,14 @@ for grpo_step in range(N_GRPO_STEPS):
             batch_raw_rewards,
             batch_old_log_probs,
         ) in enumerate(dataloader):
-            policy_log_probs = get_response_log_probs(model, batch_inputs, batch_labels)
+            batch_inputs = batch_inputs.to(device)
+            batch_labels = batch_labels.to(device)
+            batch_masks = batch_masks.to(device)
+            batch_advantages = batch_advantages.to(device)
+            batch_raw_rewards = batch_raw_rewards.to(device)
+            batch_old_log_probs = batch_old_log_probs.to(device)
+            response_log_probs = get_response_log_probs(model, batch_inputs, batch_labels)
+            policy_log_probs = response_log_probs["log_probs"]
             loss, _ = grpo_microbatch_train_step(
                 policy_log_probs=policy_log_probs,
                 response_mask=batch_masks,
@@ -179,7 +184,7 @@ for grpo_step in range(N_GRPO_STEPS):
                 raw_rewards=batch_raw_rewards,
                 advantages=batch_advantages,
                 old_log_prob=batch_old_log_probs,
-                clipsrange=CLIPRANGE,
+                cliprange=CLIPRANGE,
             )
             print("-----> idx loss:", loss)
             if (idx + 1) % GRADIENT_ACC_STEPS == 0:

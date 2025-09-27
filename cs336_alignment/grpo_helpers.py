@@ -1,7 +1,6 @@
 from typing import Literal
 import torch
 
-
 def compute_group_normalized_rewards(
     reward_fn,
     rollout_responses: list[str],
