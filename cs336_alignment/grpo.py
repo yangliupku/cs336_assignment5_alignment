@@ -37,6 +37,7 @@ N_MICRO_BATCHES_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // MICRO_TRAIN_BATCH_SIZE
 NORMALIZE_BY_STD = True
 LOSS_TYPE = "reinforce_with_baseline"
 CLIPRANGE = 0.2
+MAX_GRAD_NORM = 1.0
 
 device = torch.device("cuda:0")
 
@@ -182,5 +183,6 @@ for grpo_step in range(N_GRPO_STEPS):
             )
             print("-----> idx loss:", loss)
             if (idx + 1) % GRADIENT_ACC_STEPS == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
                 opt.step()
                 opt.zero_grad()
