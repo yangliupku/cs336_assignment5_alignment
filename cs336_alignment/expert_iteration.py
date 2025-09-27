@@ -2,7 +2,7 @@ import random
 import torch
 import pathlib
 from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedModel
-from vllm.model_executer import set_random_seed as vllm_set_random_seed
+from vllm.model_executor import set_random_seed as vllm_set_random_seed
 from vllm import LLM, SamplingParams
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 from cs336_alignment.utils import load_jsonl
@@ -18,11 +18,12 @@ from torch.utils.data import DataLoader, TensorDataset
 DATASETS_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "data" / "MATH"
 MODEL_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "models" / "Qwen2.5-Math-1.5"
 
-EI_SAMPLE_SIZE = 32  # number of questions to sample in each EI step
+EI_SAMPLE_SIZE = 256  # number of questions to sample in each EI step
 GROUP_SIZE = 5  # number of responses for each question
-NUM_EI_STEPS = 100
-LR = 1e-3
+NUM_EI_STEPS = 20
+LR = 1e-4
 GRAD_STEPS = 4
+MICROBATCH_SIZE = 8
 
 device = torch.device("cuda:0")
 
@@ -49,7 +50,7 @@ def set_all_seed():
 
 def load_base_model():
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_PATH, torch_type=torch.bfloat16, attention_implementation="flash_attention_2"
+        MODEL_PATH, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2"
     ).to(device)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     return (model, tokenizer)
@@ -84,7 +85,7 @@ def get_correct_prompt_and_output(prompts: list[str], solutions: list[str], llm:
     for i in range(len(prompts)):
         model_response = responses[i].outputs[0].text
         reward = r1_zero_reward_fn(model_response, solutions[i])
-        if reward["r1_reward"] == 1:
+        if reward["reward"] == 1:
             correct_outputs.append(model_response)
             correct_prompts.append(prompts[i])
     return correct_prompts, correct_outputs
@@ -119,33 +120,34 @@ for ei_step_i in range(NUM_EI_STEPS):
     ei_repeated_solutions = [s["solution"] for s in ei_sample_data for _ in range(GROUP_SIZE)]
     ei_repeated_prompts = [get_prompt(q) for q in ei_repeated_questions]
     load_policy_into_vllm_instance(model, llm)
-    validation_acc = get_validation_accuracy(llm, validation_ds)
+    validation_acc = get_validation_accuracy(validation_ds, llm)
     print("---------> validation acc:", validation_acc)
     training_prompts, training_outputs = get_correct_prompt_and_output(
         ei_repeated_prompts, ei_repeated_solutions, llm
     )
     print("--------> number of training samples:", len(training_outputs))
-    tokenized_training_data = tokentize_prompt_and_output(
-        training_prompts, training_outputs, tokenizer
-    )
-    dataset = TensorDataset(
-        tokenized_training_data["input_ids"],
-        tokenized_training_data["labels"],
-        tokenized_training_data["response_mask"],
-    )
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
-    opt.zero_grad()
-
-    for idx, (batch_inputs, batch_labels, batch_masks) in enumerate(dataloader):
-        batch_inputs = batch_inputs.to(device)
-        bach_labels = batch_labels.to(device)
-        batch_masks = batch_masks.to(device)
-        response_log_probs = get_response_log_probs(model, batch_inputs, batch_labels)
-        loss, _ = sft_microbatch_train_step(
-            response_log_probs["log_probs"],
-            batch_masks,
-            gradient_accumulation_steps=GRAD_STEPS,
+    if len(training_outputs) > 0:
+        tokenized_training_data = tokentize_prompt_and_output(
+            training_prompts, training_outputs, tokenizer
         )
-        if (idx + 1) % GRAD_STEPS == 0:
-            opt.step()
-            opt.zero_grad()
+        dataset = TensorDataset(
+            tokenized_training_data["input_ids"],
+            tokenized_training_data["labels"],
+            tokenized_training_data["response_mask"],
+        )
+        dataloader = DataLoader(dataset, batch_size=MICROBATCH_SIZE, shuffle=True)
+        opt.zero_grad()
+        for idx, (batch_inputs, batch_labels, batch_masks) in enumerate(dataloader):
+            batch_inputs = batch_inputs.to(device)
+            batch_labels = batch_labels.to(device)
+            batch_masks = batch_masks.to(device)
+            response_log_probs = get_response_log_probs(model, batch_inputs, batch_labels)
+            loss, _ = sft_microbatch_train_step(
+                response_log_probs["log_probs"],
+                batch_masks,
+                gradient_accumulation_steps=GRAD_STEPS,
+            )
+            print("-----> idx loss:", loss)
+            if (idx + 1) % GRAD_STEPS == 0:
+                opt.step()
+                opt.zero_grad()
