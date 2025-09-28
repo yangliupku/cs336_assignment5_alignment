@@ -19,6 +19,7 @@ dependencies = [
     "wandb>=0.19.8",
     "xopen>=2.0.2",
     "datasets>=2.14.6",
+    "jaxtyping>=0.3.2",
 ]
 
 [dependency-groups]
@@ -42,3 +43,6 @@ log_cli_level = "WARNING"
 name = "flash-attn"
 version = "2.7.4.post1"
 requires-dist = ["torch", "einops", "setuptools"]
+
+[tool.ruff]
+ignore = ["F722"]

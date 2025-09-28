@@ -6,7 +6,7 @@ from vllm.model_executor import set_random_seed as vllm_set_random_seed
 from vllm import LLM, SamplingParams
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 from cs336_alignment.utils import load_jsonl
-from cs336_alignment.sft_helpers import (
+from cs336_alignment.alignment_helpers import (
     tokentize_prompt_and_output,
     get_response_log_probs,
     sft_microbatch_train_step,

@@ -6,15 +6,14 @@ from vllm.model_executor import set_random_seed as vllm_set_random_seed
 from vllm import LLM, SamplingParams
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 from cs336_alignment.utils import load_jsonl
-from cs336_alignment.sft_helpers import (
+from cs336_alignment.alignment_helpers import (
     tokentize_prompt_and_output,
     get_response_log_probs,
     get_old_policy_log_probs_in_batches,
-)
-from cs336_alignment.grpo_helpers import (
     compute_group_normalized_rewards,
     grpo_microbatch_train_step,
 )
+
 from unittest.mock import patch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, TensorDataset
@@ -148,7 +147,9 @@ for grpo_step in range(N_GRPO_STEPS):
     rollout_batch_input_ids = tokenized_rollout_batch["input_ids"]
     rollout_batch_labels = tokenized_rollout_batch["labels"]
     rollout_batch_response_masks = tokenized_rollout_batch["response_mask"]
-    old_log_prob_res = get_old_policy_log_probs_in_batches(model, rollout_batch_input_ids, rollout_batch_labels)
+    old_log_prob_res = get_old_policy_log_probs_in_batches(
+        model, rollout_batch_input_ids, rollout_batch_labels
+    )
     rollout_batch_old_log_probs = old_log_prob_res["log_probs"]
     dataset = TensorDataset(
         rollout_batch_input_ids,
