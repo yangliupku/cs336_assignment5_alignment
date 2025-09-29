@@ -57,7 +57,7 @@ def set_all_seed():
 
 run = wandb.init(
     project="cs336_assignment5",
-    tags=["grpo_learning_rate"]
+    tags=["grpo_learning_rate"],
     config={
         "rollout_batch_size": ROLLOUT_BATCH_SIZE,
         "train_batch_size": TRAIN_BATCH_SIZE,
