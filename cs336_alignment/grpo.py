@@ -29,7 +29,7 @@ MODEL_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "models" / "Qwen
 
 ROLLOUT_BATCH_SIZE = 256
 TRAIN_BATCH_SIZE = 256
-EPOCHS_PER_RLLOUT_BATCH = 1
+EPOCHS_PER_RLLOUT_BATCH = 4
 # ROLLOUT_BATCH_SIZE / TRAIN_BATCH_SIZE * EPOCH_PER_ROLLOUT = number of gradient updats per rollout
 GROUP_SIZE = 8
 GRADIENT_ACC_STEPS = 128
@@ -42,8 +42,8 @@ N_PROMPTS_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // GROUP_SIZE
 N_MICRO_BATCHES_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // MICRO_TRAIN_BATCH_SIZE
 
 NORMALIZE_BY_STD = True
-LOSS_TYPE = "reinforce_with_baseline"
-# LOSS_TYPE = "grpo_clip"
+# LOSS_TYPE = "reinforce_with_baseline"
+LOSS_TYPE = "grpo_clip"
 CLIPRANGE = 0.2
 MAX_GRAD_NORM = 1.0
 
@@ -57,7 +57,7 @@ def set_all_seed():
 
 run = wandb.init(
     project="cs336_assignment5",
-    tags=["grpo_learning_rate"],
+    tags=["grpo_off_policy"],
     config={
         "rollout_batch_size": ROLLOUT_BATCH_SIZE,
         "train_batch_size": TRAIN_BATCH_SIZE,
