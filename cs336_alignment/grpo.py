@@ -1,6 +1,7 @@
 import random
 import torch
 import pathlib
+import wandb
 from vllm.model_executor import set_random_seed as vllm_set_random_seed
 from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
 from cs336_alignment.utils import (
@@ -53,6 +54,27 @@ def set_all_seed():
     vllm_set_random_seed(0)
 
 
+run = wandb.init(
+    project="cs336_assignment5",
+    config={
+        "rollout_batch_size": ROLLOUT_BATCH_SIZE,
+        "train_batch_size": TRAIN_BATCH_SIZE,
+        "epochs_per_rollout_batch": EPOCHS_PER_RLLOUT_BATCH,
+        "group_size": GROUP_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACC_STEPS,
+        "learning_rate": LR,
+        "rollout_steps": N_GRPO_STEPS,
+        "micro_train_batch_size": MICRO_TRAIN_BATCH_SIZE,
+        "loss_type": LOSS_TYPE,
+        "cliprange": CLIPRANGE,
+        "max_grad_norm": MAX_GRAD_NORM,
+    },
+)
+wandb.define_metric("rollout_step")
+wandb.define_metric("train_step")
+wandb.define_metric("rollout/*", step_metric="rollout_step")
+wandb.define_metric("train/*", step_metric="train_step")
+
 set_all_seed()
 model, tokenizer = load_base_model(device)
 llm = init_vllm()
@@ -62,7 +84,7 @@ train_ds = load_jsonl(DATASETS_PATH / "train.jsonl")
 validation_ds = load_jsonl(DATASETS_PATH / "validation.jsonl")
 validation_ds = validation_ds[:1024]
 random.shuffle(train_ds)
-
+train_step_idx = 0
 for grpo_step in range(N_GRPO_STEPS):
     rollout_sample_data = train_ds[
         grpo_step * N_PROMPTS_PER_ROLLOUT_BATCH : (1 + grpo_step) * N_PROMPTS_PER_ROLLOUT_BATCH
@@ -88,6 +110,13 @@ for grpo_step in range(N_GRPO_STEPS):
         normalize_by_std=NORMALIZE_BY_STD,
     )
     print("---------> total raw rewards:", torch.sum(raw_rewards))
+    wandb.log(
+        {
+            "rollout_step": grpo_step,
+            "rollout/raw_rewards": torch.sum(raw_rewards),
+            "rollout/validation_accuracy": validation_acc,
+        }
+    )
 
     tokenized_rollout_batch = tokentize_prompt_and_output(
         rollout_repeated_prompts, rollout_responses, tokenizer
@@ -118,6 +147,7 @@ for grpo_step in range(N_GRPO_STEPS):
             batch_raw_rewards,
             batch_old_log_probs,
         ) in enumerate(dataloader):
+            train_step_idx += 1
             batch_inputs = batch_inputs.to(device)
             batch_labels = batch_labels.to(device)
             batch_masks = batch_masks.to(device)
@@ -136,6 +166,13 @@ for grpo_step in range(N_GRPO_STEPS):
                 old_log_prob=batch_old_log_probs,
                 cliprange=CLIPRANGE,
             )
+            wandb.log(
+                {
+                    "train_step": train_step_idx,
+                    "train/loss": loss,
+                }
+            )
+
             if (idx + 1) % GRADIENT_ACC_STEPS == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
                 opt.step()
