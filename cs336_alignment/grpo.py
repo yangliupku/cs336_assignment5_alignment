@@ -29,20 +29,21 @@ MODEL_PATH = (pathlib.Path(__file__).resolve().parent.parent) / "models" / "Qwen
 
 ROLLOUT_BATCH_SIZE = 256
 TRAIN_BATCH_SIZE = 256
-EPOCHS_PER_RLLOUT_BATCH = 4
+EPOCHS_PER_RLLOUT_BATCH = 1
 # ROLLOUT_BATCH_SIZE / TRAIN_BATCH_SIZE * EPOCH_PER_ROLLOUT = number of gradient updats per rollout
 GROUP_SIZE = 8
 GRADIENT_ACC_STEPS = 128
-LR = 1e-5
-N_GRPO_STEPS = 200
+LR = 1e-4
+N_GRPO_STEPS = 100
+FULL_VALIDATION_STEPS = 5
 
 MICRO_TRAIN_BATCH_SIZE = TRAIN_BATCH_SIZE // GRADIENT_ACC_STEPS
 N_PROMPTS_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // GROUP_SIZE
 N_MICRO_BATCHES_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // MICRO_TRAIN_BATCH_SIZE
 
 NORMALIZE_BY_STD = True
-# LOSS_TYPE = "reinforce_with_baseline"
-LOSS_TYPE = "grpo_clip"
+LOSS_TYPE = "reinforce_with_baseline"
+# LOSS_TYPE = "grpo_clip"
 CLIPRANGE = 0.2
 MAX_GRAD_NORM = 1.0
 
@@ -82,10 +83,18 @@ opt = AdamW(model.parameters(), lr=LR, weight_decay=0, betas=(0.9, 0.95))
 
 train_ds = load_jsonl(DATASETS_PATH / "train.jsonl")
 validation_ds = load_jsonl(DATASETS_PATH / "validation.jsonl")
-validation_ds = validation_ds[:1024]
+quick_validation_ds = validation_ds[:1024]
 random.shuffle(train_ds)
 train_step_idx = 0
 for grpo_step in range(N_GRPO_STEPS):
+    if grpo_step % FULL_VALIDATION_STEPS == 0:
+        full_validation_acc = get_validation_accuracy(validation_ds, llm)
+        wandb.log(
+            {
+                "rollout_step": grpo_step,
+                "rollout/full_validation_accuracy": full_validation_acc,
+            }
+        )        
     rollout_sample_data = train_ds[
         grpo_step * N_PROMPTS_PER_ROLLOUT_BATCH : (1 + grpo_step) * N_PROMPTS_PER_ROLLOUT_BATCH
     ]
@@ -97,7 +106,7 @@ for grpo_step in range(N_GRPO_STEPS):
     ]
     rollout_repeated_prompts = [get_prompt(q) for q in rollout_repeated_questions]
     load_policy_into_vllm_instance(model, llm)
-    validation_acc = get_validation_accuracy(validation_ds, llm)
+    validation_acc = get_validation_accuracy(quick_validation_ds, llm)
     print("---------> validation acc:", validation_acc)
     llm_response = llm.generate(rollout_repeated_prompts, sampling_params)
     rollout_responses = [r.outputs[0].text for r in llm_response]
@@ -177,3 +186,7 @@ for grpo_step in range(N_GRPO_STEPS):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
                 opt.step()
                 opt.zero_grad()
+# final validation
+final_validation_acc = get_validation_accuracy(validation_ds, llm)
+wandb.summary["final_validation_accuracy"] = final_validation_acc
+wandb.finish()
