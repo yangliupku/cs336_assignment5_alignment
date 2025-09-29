@@ -33,7 +33,7 @@ EPOCHS_PER_RLLOUT_BATCH = 1
 # ROLLOUT_BATCH_SIZE / TRAIN_BATCH_SIZE * EPOCH_PER_ROLLOUT = number of gradient updats per rollout
 GROUP_SIZE = 8
 GRADIENT_ACC_STEPS = 128
-LR = 1e-4
+LR = 1e-5
 N_GRPO_STEPS = 100
 FULL_VALIDATION_STEPS = 5
 
@@ -57,6 +57,7 @@ def set_all_seed():
 
 run = wandb.init(
     project="cs336_assignment5",
+    tags=["grpo_learning_rate"]
     config={
         "rollout_batch_size": ROLLOUT_BATCH_SIZE,
         "train_batch_size": TRAIN_BATCH_SIZE,
@@ -183,7 +184,13 @@ for grpo_step in range(N_GRPO_STEPS):
             )
 
             if (idx + 1) % GRADIENT_ACC_STEPS == 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
+                wandb.log(
+                    {
+                        "train_step": train_step_idx,
+                        "train/grad_norm": grad_norm,
+                    }
+                )
                 opt.step()
                 opt.zero_grad()
 # final validation
