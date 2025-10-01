@@ -36,6 +36,7 @@ GRADIENT_ACC_STEPS = 128
 LR = 1e-5
 N_GRPO_STEPS = 100
 FULL_VALIDATION_STEPS = 5
+OLD_POLICY_PROB_BATCH = 8
 
 MICRO_TRAIN_BATCH_SIZE = TRAIN_BATCH_SIZE // GRADIENT_ACC_STEPS
 N_PROMPTS_PER_ROLLOUT_BATCH = ROLLOUT_BATCH_SIZE // GROUP_SIZE
@@ -135,7 +136,7 @@ for grpo_step in range(N_GRPO_STEPS):
     rollout_batch_labels = tokenized_rollout_batch["labels"]
     rollout_batch_response_masks = tokenized_rollout_batch["response_mask"]
     old_log_prob_res = get_old_policy_log_probs_in_batches(
-        model, rollout_batch_input_ids, rollout_batch_labels
+        model, rollout_batch_input_ids, rollout_batch_labels, batch_size=OLD_POLICY_PROB_BATCH
     )
     rollout_batch_old_log_probs = old_log_prob_res["log_probs"]
     dataset = TensorDataset(
